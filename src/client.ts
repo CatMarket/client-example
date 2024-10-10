@@ -1,7 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 export import btc = require('bitcore-lib-inquisition')
-import fs from 'fs'
 import * as dotenv from 'dotenv'
 dotenv.config()
 const request = require('superagent')
