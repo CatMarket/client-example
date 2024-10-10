@@ -113,7 +113,6 @@ class Client {
                 orderType,
                 tokenAmount: tokenAmount,
                 satoshis: satoshis,
-                feePerByte: 50
             })
             console.info('makeOrder result: %s', res.body.data)
 

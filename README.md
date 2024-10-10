@@ -1,5 +1,7 @@
 # CatMarket API client
 
+API doc: https://api.catmarket.io/api-docs/
+
 ## Install
 
 ```bash
@@ -17,5 +19,5 @@ set the PRIV_KEY and MARKET_KEY in .env
 ## Run
 
 ```bash
-ts-node src/client.ts makebuy 59d566844f434e419bf5b21b5c601745fcaaa24482b8d68f32b2582c61a95af2_0
+ts-node src/client.ts makebuy 45ee725c2c5993b3e4d308842d87e973bf1951f5f7a804b21e4dd964ecd12d6b_0
 ```
