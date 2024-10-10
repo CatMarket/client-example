@@ -18,5 +18,5 @@
     "declaration": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "tests/dataServiceMock.ts"]
+  "include": ["src/**/*.ts"]
 }
