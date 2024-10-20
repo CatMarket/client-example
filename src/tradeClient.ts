@@ -17,8 +17,7 @@ const key = 'Bearer ' + process.env.MARKET_KEY
 const privateKeyMain = btc.PrivateKey.fromWIF(process.env.PRIV_KEY)
 const addressType = btc.Address.PayToTaproot
 const network = 'livenet'
-//const baseUrl = 'http://localhost:3000'
-const baseUrl = 'https://api.catmarket.io'
+const baseUrl = process.env.BASE_URL || 'https://api.catmarket.io'
 
 export function toXOnlyPubKeyBuf(pubKey: Buffer) {
     return pubKey.subarray(1)
@@ -47,7 +46,6 @@ export function signPsbt(data: any, wif: string, network = bitcoin.networks.bitc
     for (let i = 0; i < data.psbts!.length; i++) {
         const psbtHex = data.psbts![i]
         const psbt = bitcoin.Psbt.fromHex(psbtHex)
-        console.info('signPsbt: psbt %d, locktime %d', i, psbt.locktime)
         for (let j = 0; j < data.toSignInputs![i].length; j++) {
             const args = data.toSignInputs![i][j]
             const signer = args.disableTweakSigner === true ? keyPair : tweakedSigner
@@ -113,7 +111,7 @@ class Client {
                 tokenAmount: tokenAmount,
                 satoshis: satoshis,
             })
-            console.info('makeOrder result: %s', res.body.data)
+            console.info('makeOrder result: %s', JSON.stringify(res.body, null, 2))
 
             if (res.body.code !== 0) {
                 console.error('makeOrder failed: %s', res.body)
@@ -131,7 +129,7 @@ class Client {
                 requestId: data.requestId,
                 sigs: sigs
             })
-            console.info('makeOrder result: %s, %s', makeRes.body.msg || 'success', makeRes.body.data)
+            console.info('makeOrder result: %s', JSON.stringify(makeRes.body, null, 2))
         } catch (e) {
             console.error(e)
         }
@@ -144,7 +142,7 @@ class Client {
                 address: this.address.toString(),
                 pubKey: this.pubKey.toString('hex'),
             })
-            console.info('takeOrder result: %s', res.body.data)
+            console.info('takeOrder result: %s', JSON.stringify(res.body, null, 2))
 
             if (res.body.code !== 0) {
                 console.error('takeOrder failed: %s', res.body)
@@ -160,8 +158,36 @@ class Client {
                 requestId: data.requestId,
                 sigs: sigs
             })
-            console.info('takeOrder result: %s', takeRes.body.data)
-            
+            console.info('takeOrder result: %s', JSON.stringify(takeRes.body, null, 2))
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    async takeOrders(orderIds: string[]) {
+        try {
+            const res = await request.post(`${baseUrl}/takeOrders`).set('Authorization', key).send({
+                orderIds: orderIds,
+                address: this.address.toString(),
+                pubKey: this.pubKey.toString('hex'),
+            })
+            console.info('takeOrders result: %s', JSON.stringify(res.body, null, 2))
+
+            if (res.body.code !== 0) {
+                console.error('takeOrders failed: %s', res.body)
+                return
+            }
+
+            const data = res.body.data
+
+            const psbts = signPsbt(data, this.privateKey.toWIF())
+            const sigs = extractSigs(psbts, data.toSignInputs)
+
+            const takeRes = await request.post(`${baseUrl}/takeOrdersSign`).set('Authorization', key).send({
+                requestId: data.requestId,
+                sigs: sigs
+            })
+            console.info('takeOrders result: %s', JSON.stringify(takeRes.body, null, 2))
         } catch (e) {
             console.error(e)
         }
@@ -172,7 +198,12 @@ class Client {
             const res = await request.post(`${baseUrl}/cancelOrder`).set('Authorization', key).send({
                 orderId: orderId,
         })
-            console.info('cancelSell result: %s', res.body)
+            console.info('cancelSell result: %s', JSON.stringify(res.body, null, 2))
+
+            if (res.body.code !== 0) {
+                console.error('cancelSell failed: %s', res.body)
+                return
+            }
 
             const data = res.body.data
 
@@ -183,10 +214,64 @@ class Client {
                 requestId: data.requestId,
                 sigs: sigs
             })
-            console.info('cancelSell result: %s', cancelRes.body.data)
+            console.info('cancelSell result: %s', JSON.stringify(cancelRes.body, null, 2))
         } catch (e) {
             console.error(e)
         }
+    }
+
+    async buyLimit(tokenId: string, price: number, amount: number) {
+        const res = await request.post(`${baseUrl}/buyLimit`).set('Authorization', key).send({
+            address: this.address.toString(),
+            pubKey: this.pubKey.toString('hex'),
+            tokenId, 
+            price, 
+            satoshis: amount,
+        })
+        console.info('buyLimit result: %s', JSON.stringify(res.body, null, 2))
+
+        if (res.body.code !== 0) {
+            console.error('buyLimit failed: %s', res.body)
+            return
+        }
+
+        const data = res.body.data
+
+        const psbts = signPsbt(data, this.privateKey.toWIF())
+        const sigs = extractSigs(psbts, data.toSignInputs)
+
+        const buyRes = await request.post(`${baseUrl}/buyLimitSign`).set('Authorization', key).send({
+            requestId: data.requestId,
+            sigs: sigs
+        })
+        console.info('buyLimit result: %s', JSON.stringify(buyRes.body, null, 2))
+    }
+
+    async sellLimit(tokenId: string, price: number, amount: number) {
+        const res = await request.post(`${baseUrl}/sellLimit`).set('Authorization', key).send({ 
+            address: this.address.toString(),
+            pubKey: this.pubKey.toString('hex'),
+            tokenId, 
+            price, 
+            tokenAmount: amount
+        })
+        console.info('sellLimit result: %s', JSON.stringify(res.body, null, 2))
+
+        if (res.body.code !== 0) {
+            console.error('sellLimit failed: %s', res.body)
+            return
+        }
+
+        const data = res.body.data
+
+        const psbts = signPsbt(data, this.privateKey.toWIF())
+        const sigs = extractSigs(psbts, data.toSignInputs)
+
+        const sellRes = await request.post(`${baseUrl}/sellLimitSign`).set('Authorization', key).send({
+            requestId: data.requestId,
+            sigs: sigs
+        })
+        console.info('sellLimit result: %s', JSON.stringify(sellRes.body, null, 2))
     }
 }
 
@@ -208,9 +293,22 @@ async function main() {
     } else if (op == 'take') {
         const orderId = process.argv[3]
         client.takeOrder(orderId)
+    } else if (op == 'takeorders') {
+        const orderIds = process.argv.slice(3)
+        client.takeOrders(orderIds)
     } else if (op == 'cancel') {
         const orderId = process.argv[3]
         client.cancelOrder(orderId)
+    } else if (op == 'buylimit') {
+        const tokenId = process.argv[3]
+        const price = parseInt(process.argv[4])
+        const amount = parseInt(process.argv[5])
+        client.buyLimit(tokenId, price, amount)
+    } else if (op == 'selllimit') {
+        const tokenId = process.argv[3]
+        const price = parseInt(process.argv[4])
+        const amount = parseInt(process.argv[5])
+        client.sellLimit(tokenId, price, amount)
     }
 }
 
